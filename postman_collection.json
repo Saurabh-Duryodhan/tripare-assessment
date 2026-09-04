@@ -1,0 +1,223 @@
+{
+  "info": {
+    "_postman_id": "8f3b2c1a-5d4e-4f6a-9b1c-3e2a1d0f5e8b",
+    "name": "Tripare.AI - Hotel Offer Orchestrator",
+    "description": "Postman test collection for Tripare.AI Hotel Offer Orchestration assessment, covering parallel aggregation, price deduplication, Redis-level price filtering, and supplier outage simulation.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Orchestrated Hotels - Delhi (Overlapping Aggregation)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/hotels?city=delhi",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "hotels"],
+          "query": [
+            {
+              "key": "city",
+              "value": "delhi"
+            }
+          ]
+        },
+        "description": "Fetches aggregated and deduplicated hotels for Delhi. Supplier A and B are called in parallel via Temporal. Cheapest price wins for overlapping hotels ('Holtin' 5340 from Supplier B, 'Radison' 5900 from Supplier A)."
+      },
+      "response": []
+    },
+    {
+      "name": "2. Filtered Hotels by Price Range (In-Redis Filter)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/hotels?city=delhi&minPrice=5000&maxPrice=6000",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "hotels"],
+          "query": [
+            {
+              "key": "city",
+              "value": "delhi"
+            },
+            {
+              "key": "minPrice",
+              "value": "5000"
+            },
+            {
+              "key": "maxPrice",
+              "value": "6000"
+            }
+          ]
+        },
+        "description": "Filters hotels inside Redis Sorted Set using ZRANGEBYSCORE between 5000 and 6000."
+      },
+      "response": []
+    },
+    {
+      "name": "3. City with No Results",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/hotels?city=nonexistentcity",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "hotels"],
+          "query": [
+            {
+              "key": "city",
+              "value": "nonexistentcity"
+            }
+          ]
+        },
+        "description": "Verifies graceful handling when neither supplier has hotels for the requested city. Returns empty array []."
+      },
+      "response": []
+    },
+    {
+      "name": "4. Mock Supplier A - Direct",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/supplierA/hotels?city=delhi",
+          "host": ["{{baseUrl}}"],
+          "path": ["supplierA", "hotels"],
+          "query": [
+            {
+              "key": "city",
+              "value": "delhi"
+            }
+          ]
+        },
+        "description": "Direct response from Mock Supplier A."
+      },
+      "response": []
+    },
+    {
+      "name": "5. Mock Supplier B - Direct",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/supplierB/hotels?city=delhi",
+          "host": ["{{baseUrl}}"],
+          "path": ["supplierB", "hotels"],
+          "query": [
+            {
+              "key": "city",
+              "value": "delhi"
+            }
+          ]
+        },
+        "description": "Direct response from Mock Supplier B."
+      },
+      "response": []
+    },
+    {
+      "name": "6. Simulate Supplier Outage (Toggle Fault)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"supplier\": \"A\",\n  \"faulty\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/suppliers/simulate-fault",
+          "host": ["{{baseUrl}}"],
+          "path": ["suppliers", "simulate-fault"]
+        },
+        "description": "Simulates Supplier A failure to test workflow resilience and graceful degradation."
+      },
+      "response": []
+    },
+    {
+      "name": "7. Orchestration with One Supplier Down (Resilience Test)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/hotels?city=delhi&fresh=true",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "hotels"],
+          "query": [
+            {
+              "key": "city",
+              "value": "delhi"
+            },
+            {
+              "key": "fresh",
+              "value": "true"
+            }
+          ]
+        },
+        "description": "Forces fresh orchestration when Supplier A is faulty. Workflow gracefully falls back to Supplier B results instead of crashing."
+      },
+      "response": []
+    },
+    {
+      "name": "8. Restore Supplier Outage",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"supplier\": \"A\",\n  \"faulty\": false\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/suppliers/simulate-fault",
+          "host": ["{{baseUrl}}"],
+          "path": ["suppliers", "simulate-fault"]
+        },
+        "description": "Restores Supplier A back to normal healthy operational status."
+      },
+      "response": []
+    },
+    {
+      "name": "9. Health Check Endpoint (Bonus Point)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        },
+        "description": "Evaluates overall health and dependency status of Redis, PostgreSQL, Supplier A, Supplier B, and Temporal."
+      },
+      "response": []
+    },
+    {
+      "name": "10. Swagger API Documentation",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/docs",
+          "host": ["{{baseUrl}}"],
+          "path": ["docs"]
+        },
+        "description": "Interactive Swagger UI documentation page."
+      },
+      "response": []
+    }
+  ]
+}
